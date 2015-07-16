@@ -1,0 +1,218 @@
+import csv
+import time
+import sys
+from datetime import datetime
+
+'''
+0 Session Time
+1 GPS Fix Quality
+2 Number of Satellites
+3 GPS Date & Time
+4 Latitude (deg)
+5 Longitude (deg)
+6 GPS Altitude (feet)
+7 Ground Speed (knots)
+8 Ground Track (deg)
+9 Mag Var (deg)
+10 Cross Track Error (NM)
+11 Destination Waypoint ID
+12 Range to Destination (NM)
+13 Bearing to Destination (deg)
+14 System Time
+15 Pitch (deg)
+16 Roll (deg)
+17 Magnetic Heading (deg)
+18 Indicated Airspeed (knots)
+19 Pressure Altitude (ft)
+20 Turn Rate (deg/s)
+21 Lateral Accel (g)
+22 Vertical Accel(g)
+23 Angle of Attack (%)
+24 Vertical Speed (ft/min)
+25 OAT (deg C)
+26 True Airspeed (knots)
+27 Barometer Setting (inHg)
+28 Density Altitude (ft)
+29 Wind Direction (deg)
+30 Wind Speed (knots)
+31 Heading Bug (deg)
+32 Altitude Bug (ft)
+33 Airspeed Bug (knots)
+34 Vertical Speed Bug (ft/min)
+35 Course (deg)
+36 CDI Source Type
+37 CDI Source Port
+38 CDI Scale (NM)
+39 CDI Deflection (%)
+40 Glideslope (%)
+41 AP Engaged
+42 AP Roll Mode
+43 AP Roll Force
+44 AP Roll Position (steps)
+45 AP Roll Slip (bool)
+46 AP Pitch Force
+47 AP Pitch Position (steps)
+48 AP Pitch Slip (bool)
+49 AP Yaw Force
+50 AP Yaw Position
+51 AP Yaw Slip (bool)
+52 Transponder Status
+53 Transponder Reply (bool)
+54 Transponder Identing (bool)
+55 Transponder Code (octal)
+56 Oil Pressure (PSI)
+57 Oil Temp (deg C)
+58 RPM L
+59 RPM R
+60 Manifold Pressure (inHg)
+61 Fuel Flow 1 (gal/hr)
+62 Fuel Flow 2 (gal/hr)
+63 Fuel Pressure (PSI)
+64 Fuel Level L (gal)
+65 Fuel Level R (gal)
+66 Fuel Remaining (gal)
+67 Volts 1
+68 Volts 2
+69 Amps
+70 Hobbs Time
+71 Tach Time
+72 Thermocouple 1 (deg C)
+73 Thermocouple 2 (deg C)
+74 Thermocouple 3 (deg C)
+75 Thermocouple 4 (deg C)
+76 Thermocouple 5 (deg C)
+77 Thermocouple 6 (deg C)
+78 Thermocouple 7 (deg C)
+79 Thermocouple 8 (deg C)
+80 Thermocouple 9 (deg C)
+81 EGT 2 (deg C)
+82 Thermocouple 11 (deg C)
+83 EGT 1 (deg C)
+84 Thermocouple 13 (deg C)
+85 Thermocouple 14 (deg C)
+86 CHT 1 TEMPERATURE (deg C)
+87 CHT 2 TEMPERATURE (deg C)
+88 ELEV POSITION (Sensor V)
+89 FUEL PRESSURE (PSI)
+90 PHEAT CONTACT (V)
+91 GP Input 6
+92 GP Input 7
+93 FLAPS POSITION (Sensor V)
+94 LEFT LEVEL (Sensor V)
+95 RIGHT LEVEL (Sensor V)
+96 OIL PRESSURE (PSI)
+97 OIL TEMPERATURE (deg C)
+98 GP Input 13
+99 Contacts
+100 Percent Power
+101 EGT Leaning State
+'''
+
+def writeFile( str, fileId) :
+	filename = "flight-%s.kml" % fileId
+	with open(filename, "w") as text_file:
+		print( '''<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:kml="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+<Folder>
+	<name>Flight Trace</name>
+	<description>export csv2kml (c)DD Dominique Lavault</description>
+''', file = text_file)
+		print( str, file = text_file)
+		print( '''</Folder>
+</kml>''', file = text_file)
+
+filename = ""
+try :
+	filename = sys.argv[1]
+	print( "loading " + filename)
+except :
+	#filename =  '2014-12-19-FWZJG-11.0.0.2481-DALOG-USER_LOG_DATA-PART_02.csv';
+	filename =  '2014-12-19-FWZJG-10.1.0.2277-DALOG-USER_LOG_DATA.csv'
+
+with open( filename, 'rt') as csvfile:
+	reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+	headers = next( reader)
+	column = {}
+	i = 0
+	for h in headers:
+		print ( i, h)
+		column[i] = h
+		i += 1
+
+	oldCoords = ""
+	str = ""
+	maxSpeed = 110;
+	previousRecordDate = None
+	for row in reader:
+		s = ""
+		i = 0
+		speed = ""
+		gpstime = ""
+		lat = "0"
+		lon = "0"
+		alt = "0"
+		gpsQuality = 0;
+		
+		for c in row:
+			if i == 1 and len(c) > 0 :
+				gpsQuality = c;
+			elif i == 4  and len(c) > 0 :
+				lon = c
+				if lon[0] == "+" : lon = lon[1:]
+			elif i == 5 and len(c) > 0 :
+				lat = c
+				if lat[0] == "+" : lat = lat[1:]
+			elif i == 6 and len( c) > 0 :
+				alt = float(c) *  0.3048	# ft to m
+				alt = "%.3f" % alt
+			elif i == 7 :				
+				speed = c
+			elif i == 3 and len(c) > 0:
+				try :
+					date_object = datetime.strptime(c, '%Y-%m-%d %H:%M:%S')
+					recordDate = date_object.date()
+					if( recordDate != previousRecordDate and previousRecordDate != None) :
+						fileId = recordDate.strftime("%Y-%b-%d")
+						writeFile( str, fileId)
+						str = ""
+						previousRecordDate = recordDate
+						print('rupture fichier ', fileId)
+					if previousRecordDate == None :
+						previousRecordDate = recordDate
+					gpstime = c
+				except ValueError:
+					pass
+			i += 1
+			
+		if float( lat) > 0 and float( lon) > 0 and float( alt) > 0 and gpsQuality != "1" :
+			s = lat + "," + lon + "," + alt
+			color = ""
+			try:
+				col = int(min(255, float(speed) * 255 / maxSpeed))
+				hexa = ('%02x' % col)
+				color = 'ff00' + hexa + hexa
+			except ValueError :
+				color = "ff00ffff"
+			if len( oldCoords) > 0 and s != oldCoords :
+				tmp = '''	<Placemark>
+			<name>''' + date_object.strftime('%H:%M:%S') + ''' : ''' + speed + ''' kt</name>
+			<Style>
+				<LineStyle>
+					<color>''' + color + '''</color>
+					<width>2</width>
+				</LineStyle>
+			</Style>
+			<LineString>
+				<tessellate>1</tessellate>
+				<altitudeMode>absolute</altitudeMode>
+				<coordinates>
+					''' + oldCoords + ' ' + s + '''
+				</coordinates>
+			</LineString>
+		</Placemark>
+	'''
+				str += tmp
+		oldCoords = s
+
+	if previousRecordDate != None :
+		writeFile( str, previousRecordDate.strftime("%Y-%b-%d"))
